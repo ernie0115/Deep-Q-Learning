@@ -48,19 +48,39 @@ class Environment_Easy:
         # Initialize a state array with maximum visibility distances. 
         state = np.full((self.num_values_per_eye, self.num_eyes), self.max_visibility_distance) 
 
-        # For each red apple, calculate the distance and update the state. 
-        for i, apple_position in enumerate(self.red_apple_positions): 
+        # List to hold distances for sorting. 
+        red_apple_distances = [] 
+        green_poisonous_distances = [] 
+
+        # For each red apple, calculate the distance and store it if it's within visibility range. 
+        for apple_position in self.red_apple_positions: 
             if apple_position is not None: 
                 distance = np.linalg.norm(np.array(self.agent_position) - np.array(apple_position)) 
-                if i < self.num_eyes: 
-                    state[0][i] = distance  # Update the distance to the red apple. 
+                if distance <= self.max_visibility_distance: 
+                    red_apple_distances.append(distance) 
 
-        # For each green poisonous thing, calculate the distance and update the state. 
-        for i, poison_position in enumerate(self.green_poisonous_thing_positions): 
+        # Sort distances and take the closest ones. 
+        red_apple_distances.sort() 
+        if len(red_apple_distances) <= self.num_eyes: 
+            red_apples_distances_length = len(red_apple_distances) 
+        else: 
+            red_apples_distances_length = self.num_eyes 
+        state[0][:red_apples_distances_length] = red_apple_distances[:self.num_eyes]  # Update the closest red apples. 
+
+        # For each green poisonous thing, calculate the distance and store it if it's within visibility range. 
+        for poison_position in self.green_poisonous_thing_positions: 
             if poison_position is not None: 
                 distance = np.linalg.norm(np.array(self.agent_position) - np.array(poison_position)) 
-                if i < self.num_eyes: 
-                    state[1][i] = distance  # Update the distance to the green poisonous thing. 
+                if distance <= self.max_visibility_distance: 
+                    green_poisonous_distances.append(distance) 
+
+        # Sort distances and take the closest ones. 
+        green_poisonous_distances.sort() 
+        if len(green_poisonous_distances) <= self.num_eyes: 
+            green_poisonous_distances_length = len(green_poisonous_distances) 
+        else: 
+            green_poisonous_distances_length = self.num_eyes 
+        state[1][:green_poisonous_distances_length] = green_poisonous_distances[:self.num_eyes]  # Update the closest green poisonous things. 
 
         return state 
         
@@ -81,6 +101,9 @@ class Environment_Easy:
 
         # 1. Calculate the reward. 
         reward = 0 
+
+        # 2. Determine if the episode is done. 
+        done = False 
         
         # Check if the agent collects a red apple. 
         for i in range(self.num_red_apples): 
@@ -94,11 +117,8 @@ class Environment_Easy:
             if self.green_poisonous_thing_positions[i] in self._get_agent_positions(): 
                 reward = reward - 1.0 # Add a negative reward for colliding with a green poisonous thing. 
                 self.green_poisonous_thing_positions[i] = None # Remove the collected green things from the environment. 
-                done = True # Terminate the episode. 
+                # done = True # Terminate the episode. 
                 break # Exit the loop once a green poisonous thing is collided with. 
-
-        # 2. Determine if the episode is done. 
-        done = False 
 
         # Update the agent's position based on the chosen action. 
         if action == 0 and self.agent_position[0] > self.x_min: 

@@ -7,20 +7,25 @@ from QNetwork import QNetwork
 
 # Define the Deep Q-Learning agent. 
 class DQNAgent: 
-    def __init__(self, state_size, action_size, gamma = 0.99, epsilon = 1.0, epsilon_decay = 0.995, epsilon_min = 0.01): 
-        self.state_size = state_size # state_size: 9 eyes 
+    def __init__(self, state_size, action_size, gamma = 0.99, epsilon = 1.0, epsilon_decay = 0.995, epsilon_min = 0.01, target_update_frequency = 10): 
+        self.state_size = state_size # state_size: 27 (9 eyes * 3 info) 
         self.action_size = action_size # action_size: 4 kinds of movements 
         self.gamma = gamma # Discount factor for future rewards 
         self.epsilon = epsilon # Exploration rate 
         self.epsilon_decay = epsilon_decay # Decay rate for exploration 
         self.epsilon_min = epsilon_min # Minimum exploration rate 
         
-        # Create the online network and target network. # state_size, action_size: 9 eyes, 4 kinds of movements. 
+        # Create the online network and target network. # state_size, action_size: 27 (9 eyes * 3 info), 4 kinds of movements. 
         self.online_network = QNetwork(state_size, action_size) 
         self.target_network = QNetwork(state_size, action_size) 
         self.target_network.load_state_dict(self.online_network.state_dict()) 
         self.target_network.eval()  # Freeze the target network's parameters. 
 
+        # Update Target Network More Frequently. 
+        self.target_update_frequency = target_update_frequency  # New parameter for target update frequency. 
+        self.training_step = 0  # Track the number of training steps. 
+
+        # The Adam optimizer is used to update the weights of the online_network. 
         self.optimizer = optim.Adam(self.online_network.parameters(), lr = 0.001) 
     
     # The select_action method of the DQNAgent class returns the index of the action with the highest Q-value. 
@@ -29,38 +34,41 @@ class DQNAgent:
             action = random.randrange(self.action_size) # Explore: Select a random action. 
         else: 
             with torch.no_grad(): 
-                state = torch.tensor(state, dtype = torch.float32) 
+                # Flatten the state to a 1D tensor of size 27. 
+                state = torch.tensor(state.flatten(), dtype = torch.float32) 
                 q_values = self.online_network(state) 
                 action = int(np.argmax(q_values.numpy())) # Exploit: Select the action with the highest Q-value. 
-
-        # Ensure action is within bounds. 
-        while action < 0 or action >= self.action_size: 
-            # Re-select the action if it is out of bounds. 
-            action = random.randrange(self.action_size) # Explore: Select a random action. 
-            
-        # Ensure action is within bounds. 
-        return max(0, min(action, self.action_size - 1)) 
+        return action 
     
     # Method to train the agent 
     def train(self, state, action, reward, next_state, done): 
-        state = torch.tensor(state, dtype = torch.float32) # Convert state to tensor. 
-        next_state = torch.tensor(next_state, dtype = torch.float32) # Convert next state to tensor. 
+        # Convert state to tensor and flatten it to 1D. 
+        state = torch.tensor(state.flatten(), dtype = torch.float32) 
+        # Convert next state to tensor and flatten it to 1D. 
+        next_state = torch.tensor(next_state.flatten(), dtype = torch.float32) 
         
-        self.optimizer.zero_grad() # 1. Clear the gradient. 
+        # 1. Clear the gradient. 
+        self.optimizer.zero_grad() 
 
-        q_values = self.online_network(state)  # Get Q-values for the current state. # 2. Input the data into the model. 
+        # 2. Input the data into the model. 
+        q_values = self.online_network(state)  # Get Q-values for the current state. 
         next_q_values = self.target_network(next_state) # Get Q-values for the next state. 
 
         target = q_values.clone() # Clone the Q-values for updating. 
 
-        # target[0][action] = reward + self.gamma * torch.max(next_q_values) 
         # Update the target for the action taken. 
-        target[0][action] = reward + self.gamma * torch.max(next_q_values) * (not done) 
+        target[action] = reward + self.gamma * torch.max(next_q_values) * (not done) 
 
         # Calculate loss and update the model. 
         loss = nn.MSELoss()(q_values, target) # 3. Calculate loss. 
         loss.backward() # 4. Calculate the gradient. [Backpropogation] 
         self.optimizer.step() # 5. Do gradient Descent. [Update the parameter.] 
+
+        # Update the target network at specified intervals. 
+        self.training_step += 1 
+        if self.training_step % self.target_update_frequency == 0: 
+            self.target_network.load_state_dict(self.online_network.state_dict()) 
+            self.target_network.eval()  # Freeze the target network's parameters. 
 
         if self.epsilon > self.epsilon_min: 
             self.epsilon *= self.epsilon_decay 
