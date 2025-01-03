@@ -7,7 +7,7 @@ from QNetwork import QNetwork
 
 # Define the Deep Q-Learning agent. 
 class DQNAgent: 
-    def __init__(self, state_size, action_size, gamma = 0.99, epsilon = 1.0, epsilon_decay = 0.995, epsilon_min = 0.01): 
+    def __init__(self, state_size, action_size, gamma = 0.99, epsilon = 1.0, epsilon_decay = 0.995, epsilon_min = 0.01, target_update_frequency = 10): 
         self.state_size = state_size # state_size: 27 (9 eyes * 3 info) 
         self.action_size = action_size # action_size: 4 kinds of movements 
         self.gamma = gamma # Discount factor for future rewards 
@@ -20,6 +20,10 @@ class DQNAgent:
         self.target_network = QNetwork(state_size, action_size) 
         self.target_network.load_state_dict(self.online_network.state_dict()) 
         self.target_network.eval()  # Freeze the target network's parameters. 
+
+        # Update Target Network More Frequently. 
+        self.target_update_frequency = target_update_frequency  # New parameter for target update frequency. 
+        self.training_step = 0  # Track the number of training steps. 
 
         # The Adam optimizer is used to update the weights of the online_network. 
         self.optimizer = optim.Adam(self.online_network.parameters(), lr = 0.001) 
@@ -59,6 +63,12 @@ class DQNAgent:
         loss = nn.MSELoss()(q_values, target) # 3. Calculate loss. 
         loss.backward() # 4. Calculate the gradient. [Backpropogation] 
         self.optimizer.step() # 5. Do gradient Descent. [Update the parameter.] 
+
+        # Update the target network at specified intervals. 
+        self.training_step += 1 
+        if self.training_step % self.target_update_frequency == 0: 
+            self.target_network.load_state_dict(self.online_network.state_dict()) 
+            self.target_network.eval()  # Freeze the target network's parameters. 
 
         if self.epsilon > self.epsilon_min: 
             self.epsilon *= self.epsilon_decay 
