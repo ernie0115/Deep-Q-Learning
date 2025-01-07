@@ -117,7 +117,7 @@ class Environment_Easy:
             if self.green_poisonous_thing_positions[i] in self._get_agent_positions(): 
                 reward = reward - 1.0 # Add a negative reward for colliding with a green poisonous thing. 
                 self.green_poisonous_thing_positions[i] = None # Remove the collected green things from the environment. 
-                # done = True # Terminate the episode. 
+                done = True # Terminate the episode. 
                 break # Exit the loop once a green poisonous thing is collided with. 
 
         # Update the agent's position based on the chosen action. 

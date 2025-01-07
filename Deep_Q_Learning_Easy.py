@@ -13,5 +13,5 @@ env = Environment_Easy(351, 289)
 
 # Main training loop 
 if __name__ == "__main__": 
-    num_episodes = 10 # Adjust the number of episodes as needed. 
+    num_episodes = 1000 # Adjust the number of episodes as needed. 
     train_dqn(num_episodes, env) 
